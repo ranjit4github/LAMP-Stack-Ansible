@@ -1,0 +1,90 @@
+---
+ - hosts: lampserver
+   become: true
+   vars:
+     mysql_root_password: "Password01"
+   tasks:
+     - name: Install Apache
+       ansible.builtin.yum: name=httpd state=present update_cache=yes
+
+     - name: Install PHP
+       ansible.builtin.yum : name={{item}} state=present update_cache=yes
+       with_items:
+            - php
+            - php-mysql
+            
+     - name: Deploy website by copying the content
+       ansible.builtin.copy:
+         src: /home/ec2-user/TechnicianReport/
+         dest: /var/www/html/TechnicianReport/
+         
+     - name: Start Apache Server
+       service:
+         name: httpd
+         enabled: true
+         state: started
+         
+     - name: Download Mariadb repo
+       ansible.builtin.get_url:
+         url: https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
+         dest: /home/ec2-user/mariadb_repo_setup
+         
+     - name: Setup mariadb version to 10.7
+       ansible.builtin.command:
+         cmd: bash mariadb_repo_setup --os-type=rhel --os-version=7 --mariadb-server-version=10.7
+       become: yes
+       become_user: root
+       
+     - name: Remove cache
+       ansible.builtin.command:
+         cmd: rm -rf /var/cache/yum
+       become: yes
+       become_user: root
+       
+     - name: Install Mariadb
+       ansible.builtin.yum: name={{item}} state=present update_cache=yes
+       with_items:
+            - MariaDB-server
+            - MariaDB-client         
+       become: yes
+       become_user: root
+       
+     - name: Copy db dump file
+       ansible.builtin.copy:
+         src: dump.sql
+         dest: /tmp
+     - name: Start MariaDB
+       service:
+         name: mariadb
+         enabled: true
+         state: started
+         
+     - name: Install dependency for mysql_db module
+       ansible.builtin.yum: name=MySQL-python state=present
+       
+     - name: mysql root password
+       community.mysql.mysql_user:
+         login_user: root
+         login_password: "{{mysql_root_password}}"
+         user: root
+         check_implicit_admin: true
+         password: "{{mysql_root_password}}"
+         host: localhost
+         
+     - name: Create a new database
+       community.mysql.mysql_db:
+         check_implicit_admin: true
+         login_user: root
+         login_password: "{{mysql_root_password}}"
+         name: mbdatabase
+         state: present
+         
+     - name: Dump database to dump.sql
+       community.mysql.mysql_db:
+         check_implicit_admin: true
+         login_user: root
+         login_password: "{{mysql_root_password}}"         
+         state: import
+         name: mbdatabase
+         encoding: latin1
+         target: /tmp/dump.sql
