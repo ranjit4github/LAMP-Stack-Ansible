@@ -8,7 +8,7 @@
  - hosts: lampserver
    become: true
    vars:
-     mysql_root_password: "Password01"
+     mysql_root_password: "Sunday@2023"
    tasks:
      - name: Install Apache
        ansible.builtin.yum: name=httpd state=present update_cache=yes
@@ -18,11 +18,6 @@
        with_items:
             - php
             - php-mysql
-            
-     - name: Deploy website by copying the content
-       ansible.builtin.copy:
-         src: /home/ec2-user/TechnicianReport/
-         dest: /var/www/html/TechnicianReport/
          
      - name: Start Apache Server
        service:
@@ -94,3 +89,25 @@
          name: mbdatabase
          encoding: latin1
          target: /tmp/dump.sql
+
+     - name: Download phpMyAdmin
+       ansible.builtin.get_url:
+         url: https://www.phpmyadmin.net/downloads/phpMyAdmin-latest-all-languages.tar.gz
+         dest: /var/www/html
+         become: true
+         become_user: root
+        
+     - name: Create Directory
+       ansible.builtin.file:
+         path: /var/www/html/phpMyAdmin
+         state: directory
+         mode: '0755'
+     
+     - name: Extract the tar file
+       ansible.builtin.command: chdir=/var/www/html /bin/tar xvf /var/www/html/phpMyAdmin-latest-all-languages.tar.gz -C phpMyAdmin creates=phpMyAdmin/phpMyAdmin-latest-all-languages
+
+     - name: Create a symlink
+       ansible.builtin.file:
+         src: /var/www/html/phpMyAdmin-latest-all-languages
+         dest: /var/www/html/phpMyAdmin
+         state: link
